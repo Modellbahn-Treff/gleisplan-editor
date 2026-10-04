@@ -12,7 +12,13 @@
    ===================================================================== */
 
 const NS = "http://www.w3.org/2000/svg";
-const GRID_SNAP = 20;
+const GRID_SIZES = [5, 10, 20, 40];
+const GRID_STORAGE_KEY = "gleisplan-editor-grid";
+let gridSnap = 20; // Rasterweite, vom Benutzer wählbar (siehe gridSizeSelect)
+try {
+  const g = Number(localStorage.getItem(GRID_STORAGE_KEY));
+  if (GRID_SIZES.includes(g)) gridSnap = g;
+} catch (e) { /* ignore */ }
 const STORAGE_KEY = "gleisplan-editor-state-v2";
 const VIEW_STORAGE_KEY = "gleisplan-editor-view";
 const ZOOM_MIN = 0.05;
@@ -174,7 +180,7 @@ function normalizeState(s) {
   return out;
 }
 
-function snap(v) { return snapEnabled ? Math.round(v / GRID_SNAP) * GRID_SNAP : v; }
+function snap(v) { return snapEnabled ? Math.round(v / gridSnap) * gridSnap : v; }
 
 function deg2rad(d) { return (d * Math.PI) / 180; }
 function unit(deg) { const r = deg2rad(deg); return { x: Math.cos(r), y: Math.sin(r) }; }
@@ -222,7 +228,7 @@ function redo() { stepHistory(1); }
 /* ---------- Anschluss-Geometrie (lokal, Knotenmittelpunkt = 0,0) ----------
    angle: Richtung vom Knotenmittelpunkt weg, in die der Nachbar liegt
    (0=Ost, 90=Süd, 180=West, 270=Nord; SVG-Y wächst nach unten).
-   Weichen: alle Ports liegen 20 (= GRID_SNAP) vom Mittelpunkt entfernt, der Abzweig
+   Weichen: alle Ports liegen 20 (Standard-Rasterweite) vom Mittelpunkt entfernt, der Abzweig
    auf dem 30°-Strahl (17.32 = 20·cos 30°). So liegen ungedreht Einfahrt und Stammgleis
    im Raster, und um 30° gedreht (Abzweig waagerecht) der Abzweig-Port. */
 function getPortDefs(type) {
@@ -447,12 +453,16 @@ function el(tag, attrs, cls) {
    Das Raster ist ein Muster, das stets genau den sichtbaren Ausschnitt bedeckt. */
 const view = { x: 0, y: 0, zoom: 1 };
 
-const gridPattern = el("pattern", {
-  id: "gridDots", patternUnits: "userSpaceOnUse",
-  x: -GRID_SNAP / 2, y: -GRID_SNAP / 2, width: GRID_SNAP, height: GRID_SNAP
-});
-gridPattern.appendChild(el("circle", { cx: GRID_SNAP / 2, cy: GRID_SNAP / 2, r: 1 }, "fp-grid-dot"));
+const gridPattern = el("pattern", { id: "gridDots", patternUnits: "userSpaceOnUse" });
+const gridDot = el("circle", { r: 1 }, "fp-grid-dot");
+gridPattern.appendChild(gridDot);
 layerGrid.appendChild(gridPattern);
+function applyGridSize() {
+  gridPattern.setAttribute("x", -gridSnap / 2); gridPattern.setAttribute("y", -gridSnap / 2);
+  gridPattern.setAttribute("width", gridSnap); gridPattern.setAttribute("height", gridSnap);
+  gridDot.setAttribute("cx", gridSnap / 2); gridDot.setAttribute("cy", gridSnap / 2);
+}
+applyGridSize();
 const gridRect = el("rect", { fill: "url(#gridDots)" }, "fp-grid");
 layerGrid.appendChild(gridRect);
 
@@ -463,7 +473,7 @@ function applyView() {
   svg.setAttribute("viewBox", `${view.x} ${view.y} ${w} ${h}`);
   gridRect.setAttribute("x", view.x); gridRect.setAttribute("y", view.y);
   gridRect.setAttribute("width", w); gridRect.setAttribute("height", h);
-  gridRect.setAttribute("display", view.zoom < 0.4 ? "none" : "inline"); // zu dicht zum Lesen
+  gridRect.setAttribute("display", gridSnap * view.zoom < 8 ? "none" : "inline"); // zu dicht zum Lesen
   zoomLabel.textContent = Math.round(view.zoom * 100) + "%";
   try { localStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify(view)); } catch (e) { /* ignore */ }
 }
@@ -836,6 +846,21 @@ function setTool(tool) {
 const snapToggle = document.getElementById("snapToggle");
 if (snapToggle) {
   snapToggle.addEventListener("change", () => { snapEnabled = snapToggle.checked; });
+}
+const gridSizeSelect = document.getElementById("gridSizeSelect");
+if (gridSizeSelect) {
+  GRID_SIZES.forEach(size => {
+    const o = document.createElement("option");
+    o.value = size; o.textContent = size;
+    gridSizeSelect.appendChild(o);
+  });
+  gridSizeSelect.value = gridSnap;
+  gridSizeSelect.addEventListener("change", () => {
+    gridSnap = Number(gridSizeSelect.value);
+    try { localStorage.setItem(GRID_STORAGE_KEY, gridSnap); } catch (e) { /* ignore */ }
+    applyGridSize();
+    applyView();
+  });
 }
 
 /* ---------- Zeiger-Interaktion ---------- */
@@ -1315,7 +1340,7 @@ function cutSelection() {
 }
 function duplicateSelection() {
   const clip = buildClip();
-  if (clip) pasteClip(clip, DEFAULT_PASTE_OPTIONS, { dx: GRID_SNAP, dy: GRID_SNAP });
+  if (clip) pasteClip(clip, DEFAULT_PASTE_OPTIONS, { dx: gridSnap, dy: gridSnap });
 }
 
 // Zielpunkt fürs Einfügen: Mauszeiger, sonst Mitte des sichtbaren Ausschnitts
@@ -1342,10 +1367,10 @@ function pasteClip(clip, opts, offset, target) {
     dx = offset.dx; dy = offset.dy;
   } else {
     dx = target.x - b.cx; dy = target.y - b.cy;
-    if (snapEnabled) { dx = Math.round(dx / GRID_SNAP) * GRID_SNAP; dy = Math.round(dy / GRID_SNAP) * GRID_SNAP; }
+    if (snapEnabled) { dx = Math.round(dx / gridSnap) * gridSnap; dy = Math.round(dy / gridSnap) * gridSnap; }
     if (lastPaste && lastPaste.x === dx && lastPaste.y === dy) lastPaste.count++;
     else lastPaste = { x: dx, y: dy, count: 0 };
-    dx += lastPaste.count * GRID_SNAP; dy += lastPaste.count * GRID_SNAP;
+    dx += lastPaste.count * gridSnap; dy += lastPaste.count * gridSnap;
   }
 
   const usedEntities = new Set();
@@ -1563,7 +1588,7 @@ document.addEventListener("keydown", (ev) => {
   else if (ARROW_KEYS[key] && selection.nodes.size) {
     // Pfeiltasten: ein Rasterschritt, mit Umschalt 1 px zum Feinjustieren
     ev.preventDefault();
-    const step = ev.shiftKey ? 1 : GRID_SNAP;
+    const step = ev.shiftKey ? 1 : gridSnap;
     selectedNodes().forEach(n => { n.x += ARROW_KEYS[key][0] * step; n.y += ARROW_KEYS[key][1] * step; });
     renderAll();
   }

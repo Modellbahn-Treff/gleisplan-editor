@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gleisplan-Editor für ha-floorplan</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header id="topbar">
+  <h1>Gleisplan-Editor</h1>
+  <div class="topbar-actions">
+    <button id="btnUndo" title="Rückgängig (Strg/Cmd+Z)" aria-label="Rückgängig">↶</button>
+    <button id="btnRedo" title="Wiederholen (Strg/Cmd+Umschalt+Z)" aria-label="Wiederholen">↷</button>
+    <span class="sep"></span>
+    <button id="btnNew">Neuer Plan</button>
+    <button id="btnSaveJson">Plan speichern (.json)</button>
+    <button id="btnLoadJson">Plan laden…</button>
+    <input type="file" id="fileLoadJson" accept="application/json" hidden>
+    <span class="sep"></span>
+    <button id="btnExportSvg" class="accent">SVG exportieren</button>
+    <button id="btnExportYaml" class="accent">ha-floorplan YAML</button>
+    <button id="btnExportCss" class="accent">CSS exportieren</button>
+    <span class="sep"></span>
+    <button id="btnHelp">Hilfe</button>
+  </div>
+</header>
+
+<div id="layout">
+  <aside id="toolbar">
+    <div class="tool-group">
+      <div class="tool-group-title">Auswahl</div>
+      <button class="tool-btn" data-tool="select" title="Auswählen / Verschieben / Verbinden"></button>
+      <button class="tool-btn" data-tool="erase" title="Löschen"></button>
+    </div>
+    <div class="tool-group">
+      <div class="tool-group-title">Elemente (klicken oder auf den Plan ziehen)</div>
+      <button class="tool-btn" data-tool="straight" title="Kleines Gerade-Stück – zum Formen/Führen der Kurven zwischen Elementen"></button>
+      <button class="tool-btn" data-tool="turnout_l" title="Weiche links: anklicken zum Platzieren, oder auf den Plan ziehen"></button>
+      <button class="tool-btn" data-tool="turnout_r" title="Weiche rechts: anklicken zum Platzieren, oder auf den Plan ziehen"></button>
+      <button class="tool-btn" data-tool="buffer" title="Prellbock: anklicken zum Platzieren, oder auf den Plan ziehen"></button>
+      <button class="tool-btn" data-tool="link" title="Link: Gleisende mit Fortsetzung auf einer anderen Seite – in Home Assistant anklickbar"></button>
+    </div>
+    <div class="tool-group">
+      <div class="tool-group-title">Signale</div>
+      <button class="tool-btn" data-tool="signal" title="Signal auf ein Gleisstück setzen"></button>
+    </div>
+    <div class="tool-group">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);">
+        <input type="checkbox" id="snapToggle" checked> Raster einrasten
+      </label>
+    </div>
+  </aside>
+
+  <main id="canvasWrap">
+    <svg id="grid" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div id="viewControls">
+      <button id="btnZoomOut" title="Verkleinern" aria-label="Verkleinern">−</button>
+      <button id="btnZoomReset" title="Auf 100 % zurücksetzen"><span id="zoomLabel">100%</span></button>
+      <button id="btnZoomIn" title="Vergrößern" aria-label="Vergrößern">+</button>
+      <button id="btnZoomFit" title="Ganzen Plan anzeigen">Einpassen</button>
+    </div>
+  </main>
+  <div id="toast" role="status"></div>
+
+  <aside id="sidepanel">
+    <section id="propsPanel">
+      <h2>Eigenschaften</h2>
+      <div id="propsEmpty" class="muted">Kein Element ausgewählt.</div>
+      <div id="propsForm" hidden></div>
+    </section>
+
+    <section id="blocksPanel">
+      <h2>Blockabschnitte</h2>
+      <button id="btnNewBlock" class="wide">+ Neuer Block</button>
+      <ul id="blockList"></ul>
+    </section>
+  </aside>
+</div>
+
+<div id="helpOverlay" hidden>
+  <div id="helpBox">
+    <h2>Kurzanleitung</h2>
+    <ul>
+      <li>Die Buttons links zeigen jetzt <b>Symbole</b> statt Text – beim Draufhalten mit der Maus erscheint eine Beschriftung (Tooltip).</li>
+      <li><b>Element platzieren</b>: Button links anklicken (dann auf die Fläche klicken) <b>oder</b> den Button direkt auf den Plan ziehen. Frei positionierbar, kein Raster-Zwang.</li>
+      <li><b>Gerade</b> ist ein sehr kurzes Gleisstück mit zwei fest ausgerichteten Anschlüssen – nützlich, um lange Verbindungen an bestimmten Stellen "geradlinig" zu führen, statt sie komplett der automatischen Kurve zu überlassen.</li>
+      <li><b>Verbinden</b>: Im Auswahl-Werkzeug an einem offenen Anschlusspunkt (kleiner Kreis) ziehen und auf einem anderen Anschluss loslassen. Das Gleis dazwischen <b>formt sich automatisch</b> als passende Kurve.</li>
+      <li>Beim Loslassen auf leerer Fläche wird eine <b>Gerade</b> eingefügt, in Zugrichtung ausgerichtet – von ihrem freien Anschluss lässt sich die Strecke weiterziehen, durch Verschieben oder Drehen der Geraden die Kurve anpassen.</li>
+      <li><b>Unbegrenzte Zeichenfläche</b>: Der Plan hat keine Ränder. Ausschnitt verschieben mit Mausrad/Trackpad, mittlerer Maustaste oder <code>Leertaste</code>+Ziehen; zoomen mit <code>Strg/Cmd</code>+Mausrad bzw. Pinch-Geste oder den Knöpfen unten rechts („Einpassen“ zeigt den ganzen Plan). Wer ein Element oder eine Verbindung an den Rand zieht, schiebt den Ausschnitt automatisch weiter.</li>
+      <li><b>Mehrfachauswahl</b>: Auf leerer Fläche einen Rahmen aufziehen, <code>Strg/Cmd+A</code> wählt alles, <code>Umschalt</code>+Klick fügt einzelne Elemente hinzu oder entfernt sie. Die Auswahl lässt sich <b>gemeinsam verschieben</b> (an einem ausgewählten Element ziehen oder Pfeiltasten, mit <code>Umschalt</code> in 1-px-Schritten) und <b>gemeinsam drehen</b> (oranger Griff oder <code>R</code> / <code>Umschalt+R</code>).</li>
+      <li><b>Kopieren &amp; Einfügen</b>: <code>Strg/Cmd+C</code>, <code>X</code>, <code>V</code>, <code>D</code> (duplizieren). Eingefügt wird am Mauszeiger – auch in einem anderen Plan (nach „Plan laden“/„Neuer Plan“ oder in einem zweiten Fenster). Standardmäßig werden Gleise, Weichen und Signale samt HA-Entities übernommen; <code>Strg/Cmd+Umschalt+V</code> fragt, was mit Blockzuordnungen und Entities geschehen soll.</li>
+      <li><b>Rückgängig / Wiederholen</b>: <code>Strg/Cmd+Z</code> und <code>Strg/Cmd+Umschalt+Z</code> (oder <code>Strg+Y</code>). <code>Esc</code> hebt die Auswahl auf bzw. wechselt zurück zum Auswahl-Werkzeug.</li>
+      <li><b>Verschieben</b>: Element im Auswahl-Werkzeug am Körper (nicht am Anschlusspunkt) anfassen und ziehen. Verbundene Gleise passen sich live an.</li>
+      <li><b>Frei drehen</b>: Element auswählen und am orangen Griff (kleiner Kreis mit gestrichelter Linie) im Kreis ziehen – beliebiger Winkel, mit gedrückter <code>Umschalt</code>-Taste rastet er auf 15°. Alternativ <code>R</code> (15°-Schritte) oder Gradzahl direkt rechts im Feld eingeben.</li>
+      <li><b>Signal</b>: Klick auf ein Gleisstück setzt ein Signal dort; erneuter Klick an derselben Stelle wechselt die Seite. Alternativ den Signal-Button direkt auf ein Gleis ziehen. Im Auswahl-Werkzeug lässt sich ein Signal am Gleis entlang und auf die andere Seite ziehen.</li>
+      <li><b>Link</b>: Passt die Anlage nicht auf einen Plan, schließt ein Link ein Gleis wie ein Prellbock ab (Pfeil statt Querbalken). Rechts die <b>Zielseite</b> eintragen (z.B. <code>/lovelace/gleisplan-2</code>) – ein Klick auf den Link in Home Assistant öffnet dann diese Seite. Links lassen sich keinem Block zuordnen.</li>
+      <li><b>Block</b>: Erst rechts "+ Neuer Block" klicken, dann Gleisstücke <b>oder Elemente</b> (Weiche, Gerade, Prellbock) anklicken um sie zuzuweisen/zu entfernen. Danach Name/Entity/Farbe setzen.</li>
+      <li><b>Löschen</b>-Werkzeug oder Entf-Taste bei Auswahl.</li>
+      <li><b>Export</b>: SVG + CSS in <code>&lt;config&gt;/www/floorplan/</code> ablegen, YAML-Regeln in eine Lovelace <code>ha-floorplan</code>-Karte einfügen (Pfade ggf. anpassen).</li>
+    </ul>
+    <button id="btnCloseHelp" class="accent">Schließen</button>
+  </div>
+</div>
+
+<div id="pasteOverlay" class="overlay" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="pasteTitle">
+    <h2 id="pasteTitle">Einfügen mit Optionen</h2>
+    <p id="pasteSummary" class="muted"></p>
+    <fieldset>
+      <legend>Blockabschnitte</legend>
+      <label><input type="radio" name="pasteBlocks" value="none" checked> <span><b>Nur Gleise</b> – Elemente, Verbindungen und Signale ohne Blockzuordnung</span></label>
+      <label><input type="radio" name="pasteBlocks" value="new"> <span><b>Als neuer Block</b> – je betroffenem Block entsteht ein neuer Block mit gleichem Namen und gleicher Farbe</span></label>
+      <label><input type="radio" name="pasteBlocks" value="same"> <span><b>Dem selben Block zuordnen</b> – die Kopien kommen in den ursprünglichen Block; in einem anderen Plan wird ein gleichnamiger Block angelegt</span></label>
+    </fieldset>
+    <fieldset>
+      <legend>HA-Entities</legend>
+      <label><input type="radio" name="pasteEntities" value="keep" checked> <span><b>Alles übernehmen</b> – Entities werden 1:1 kopiert</span></label>
+      <label><input type="radio" name="pasteEntities" value="free"> <span><b>Übernehmen, wenn frei</b> – nur Entities, die im Zielplan noch nicht verwendet werden</span></label>
+      <label><input type="radio" name="pasteEntities" value="clear"> <span><b>Immer leeren</b> – Kopien erhalten keine Entity</span></label>
+    </fieldset>
+    <p class="hint">Element-IDs bleiben erhalten, solange sie im Zielplan frei sind – sonst wird eine neue ID vergeben. Beschriftungen werden immer übernommen.</p>
+    <div class="dialog-actions">
+      <button id="btnPasteCancel">Abbrechen</button>
+      <button id="btnPasteConfirm" class="accent">Einfügen</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

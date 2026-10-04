@@ -164,7 +164,7 @@ body { display: flex; flex-direction: column; }
 .fp-diverge-top { display: none; }
 .fp-track-node, .fp-turnout, .fp-link { cursor: grab; }
 .fp-link-arrow { stroke: #4fc3f7; stroke-width: 5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.fp-link-hit { fill: transparent; stroke: none; }
+.fp-link-hit, .fp-turnout-hit { fill: transparent; stroke: none; }
 .fp-label { fill: var(--text); stroke: none; font: 600 11px sans-serif; pointer-events: none; user-select: none; }
 .fp-turnout.node-selected .fp-through,
 .fp-turnout.node-selected .fp-diverge,

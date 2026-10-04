@@ -233,20 +233,20 @@ function getPortDefs(type) {
       return {
         entry: { x: -24, y: 0, angle: 180 },
         through: { x: 24, y: 0, angle: 0 },
-        diverge: { x: 20, y: -14, angle: 325 }
+        diverge: { x: 20, y: -14, angle: 330 }
       };
     case "turnout_r":
       return {
         entry: { x: -24, y: 0, angle: 180 },
         through: { x: 24, y: 0, angle: 0 },
-        diverge: { x: 20, y: 14, angle: 35 }
+        diverge: { x: 20, y: 14, angle: 30 }
       };
     case "turnout_y":
       return {
         entry: { x: -24, y: 0, angle: 180 },
         through: { x: 24, y: 0, angle: 0 },
-        divergeA: { x: 20, y: -14, angle: 325 },
-        divergeB: { x: 20, y: 14, angle: 35 }
+        divergeA: { x: 20, y: -14, angle: 330 },
+        divergeB: { x: 20, y: 14, angle: 30 }
       };
     case "cross":
       return {
@@ -543,6 +543,14 @@ function renderNodes() {
     }
     g.dataset.node = node.id;
     const segs = getNodeInnerPaths(node.type);
+    // Klickfläche: füllt den Zwischenraum zwischen Stammgleis und Abzweig(en), damit die
+    // Weiche in HA nicht nur auf den schmalen Strichen anklickbar ist.
+    if (TURNOUT_TYPES.has(node.type)) {
+      const through = getPortDefs(node.type).through;
+      const d = segs.filter(seg => seg.cls === "fp-diverge")
+        .map(seg => `${seg.d} L${through.x},${through.y} Z`).join(" ");
+      g.appendChild(el("path", { d }, "fp-turnout-hit"));
+    }
     segs.forEach(seg => g.appendChild(el("path", { d: seg.d }, seg.cls)));
     // SVG kennt kein z-index: Abzweig ein zweites Mal über dem Stammgleis ablegen.
     // Die Kopie ist nur bei "turnout-diverging" sichtbar, damit der gelbe (gestellte)
@@ -1946,7 +1954,7 @@ function buildCss() {
 /* Links: Klick wechselt in HA auf eine andere Seite (tap_action: navigate) */
 .fp-link { cursor: pointer; }
 .fp-link-arrow { stroke: #4fc3f7; stroke-width: 5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.fp-link-hit { fill: transparent; stroke: none; pointer-events: all; }
+.fp-link-hit, .fp-turnout-hit { fill: transparent; stroke: none; pointer-events: all; }
 
 /* Weichen-Beschriftung */
 .fp-label { fill: #cfd8dc; stroke: none; font: 600 11px sans-serif; }

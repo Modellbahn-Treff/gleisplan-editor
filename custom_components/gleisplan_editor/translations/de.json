@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Gleisplan-Editor",
+        "description": "Fügt den Gleisplan-Editor als Panel „Gleisplan“ in die Seitenleiste ein (nur für Administratoren sichtbar)."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Der Gleisplan-Editor ist bereits eingerichtet."
+    }
+  }
+}

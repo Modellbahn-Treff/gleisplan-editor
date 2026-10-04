@@ -63,10 +63,13 @@ input[type="text"], input[type="number"], select, input[type="color"] {
 .topbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .sep { width: 1px; height: 22px; background: var(--border); display: inline-block; }
 
+/* Die Kopfzeile darf umbrechen – der Plan füllt, was darunter übrig bleibt */
+body { display: flex; flex-direction: column; }
 #layout {
   display: grid;
   grid-template-columns: 150px 1fr 300px;
-  height: calc(100vh - 45px);
+  flex: 1;
+  min-height: 0;
 }
 
 #toolbar {
@@ -239,3 +242,32 @@ input[type="text"], input[type="number"], select, input[type="color"] {
   transition: opacity .15s ease, transform .15s ease; box-shadow: 0 6px 20px rgba(0,0,0,.4);
 }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* Home Assistant (nur als Panel, siehe ha.js) */
+#haBar[hidden] { display: none; }
+#haPlanName { width: 170px; }
+#haStatus { font-size: 12px; white-space: nowrap; }
+.field .ha-state.missing { color: var(--danger); }
+#blockList li.occupied { border-left: 4px solid var(--danger); }
+#haPlanList { list-style: none; margin: 0 0 14px; padding: 0; }
+#haPlanList li {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; margin-bottom: 6px;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--panel-2);
+}
+#haPlanList .plan-info { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+#haPublishSummary { overflow-wrap: anywhere; }
+#haPublishYaml {
+  display: block; width: 100%; margin-bottom: 12px; resize: vertical;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px;
+  padding: 8px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre;
+}
+
+/* Live-Zustände aus Home Assistant – gleiche Klassen wie im exportierten CSS */
+.turnout-straight .fp-through { stroke: #ffb300; }
+.turnout-straight .fp-diverge { stroke: #546069; }
+.turnout-diverging .fp-through { stroke: #546069; }
+.turnout-diverging .fp-diverge { stroke: #ffb300; }
+.turnout-diverging .fp-diverge-top { display: inline; }
+.signal-red .lamp-red { fill: #ff3b30; filter: drop-shadow(0 0 3px #ff3b30); }
+.signal-green .lamp-green { fill: #34d058; filter: drop-shadow(0 0 3px #34d058); }

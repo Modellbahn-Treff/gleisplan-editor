@@ -9,6 +9,13 @@
 <body>
 <header id="topbar">
   <h1>Gleisplan-Editor</h1>
+  <!-- Nur als Panel in Home Assistant sichtbar (siehe ha.js) -->
+  <div id="haBar" class="topbar-actions" hidden>
+    <button id="btnHaMenu" title="Seitenleiste ein-/ausblenden" aria-label="Seitenleiste" hidden>☰</button>
+    <input type="text" id="haPlanName" placeholder="Planname" title="Name des Plans in Home Assistant" aria-label="Planname">
+    <button id="btnHaPlans">Pläne…</button>
+    <span id="haStatus" class="muted" role="status"></span>
+  </div>
   <div class="topbar-actions">
     <button id="btnUndo" title="Rückgängig (Strg/Cmd+Z)" aria-label="Rückgängig">↶</button>
     <button id="btnRedo" title="Wiederholen (Strg/Cmd+Umschalt+Z)" aria-label="Wiederholen">↷</button>
@@ -21,6 +28,7 @@
     <button id="btnExportSvg" class="accent">SVG exportieren</button>
     <button id="btnExportYaml" class="accent">ha-floorplan YAML</button>
     <button id="btnExportCss" class="accent">CSS exportieren</button>
+    <button id="btnHaPublish" class="accent" title="SVG und CSS nach www/floorplan in Home Assistant schreiben" hidden>In HA veröffentlichen</button>
     <span class="sep"></span>
     <button id="btnHelp">Hilfe</button>
   </div>
@@ -97,6 +105,7 @@
       <li><b>Link</b>: Passt die Anlage nicht auf einen Plan, schließt ein Link ein Gleis wie ein Prellbock ab (Pfeil statt Querbalken). Rechts die <b>Zielseite</b> eintragen (z.B. <code>/lovelace/gleisplan-2</code>) – ein Klick auf den Link in Home Assistant öffnet dann diese Seite. Links lassen sich keinem Block zuordnen.</li>
       <li><b>Block</b>: Erst rechts "+ Neuer Block" klicken, dann Gleisstücke <b>oder Elemente</b> (Weiche, Gerade, Prellbock) anklicken um sie zuzuweisen/zu entfernen. Danach Name/Entity/Farbe setzen.</li>
       <li><b>Löschen</b>-Werkzeug oder Entf-Taste bei Auswahl.</li>
+      <li><b>In Home Assistant</b> (als Panel): Entity-Felder schlagen die vorhandenen Entities vor und zeigen deren Zustand, Weichen und Signale folgen live der Anlage. Pläne werden automatisch in Home Assistant gespeichert („Pläne…“), <b>In HA veröffentlichen</b> schreibt SVG und CSS direkt nach <code>www/floorplan</code>.</li>
       <li><b>Export</b>: SVG + CSS in <code>&lt;config&gt;/www/floorplan/</code> ablegen, YAML-Regeln in eine Lovelace <code>ha-floorplan</code>-Karte einfügen (Pfade ggf. anpassen).</li>
     </ul>
     <button id="btnCloseHelp" class="accent">Schließen</button>
@@ -127,6 +136,31 @@
   </div>
 </div>
 
+<div id="haPlansOverlay" class="overlay" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="haPlansTitle">
+    <h2 id="haPlansTitle">Pläne in Home Assistant</h2>
+    <p class="hint">Der geöffnete Plan wird automatisch gespeichert. „Neuer Plan“ legt einen weiteren Plan an.</p>
+    <ul id="haPlanList"></ul>
+    <div class="dialog-actions">
+      <button id="btnHaPlansClose" class="accent">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<div id="haPublishOverlay" class="overlay" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="haPublishTitle">
+    <h2 id="haPublishTitle">In Home Assistant veröffentlicht</h2>
+    <p id="haPublishSummary"></p>
+    <p id="haPublishHint" class="hint"></p>
+    <textarea id="haPublishYaml" rows="12" readonly spellcheck="false" aria-label="ha-floorplan Karte (YAML)"></textarea>
+    <div class="dialog-actions">
+      <button id="btnHaCopyYaml">YAML kopieren</button>
+      <button id="btnHaPublishClose" class="accent">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<script src="ha.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

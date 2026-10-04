@@ -205,6 +205,7 @@ function commitState() {
   if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
   historyIndex = undoStack.length - 1;
   try { localStorage.setItem(STORAGE_KEY, json); } catch (e) { /* ignore */ }
+  ha.planChanged();
 }
 function stepHistory(dir) {
   const idx = historyIndex + dir;
@@ -212,6 +213,7 @@ function stepHistory(dir) {
   historyIndex = idx;
   state = JSON.parse(undoStack[idx]);
   try { localStorage.setItem(STORAGE_KEY, undoStack[idx]); } catch (e) { /* ignore */ }
+  ha.planChanged();
   renderAll();
 }
 function undo() { stepHistory(-1); }
@@ -530,7 +532,7 @@ function renderNodes() {
     const sel = isSelected("node", node.id);
     if (TURNOUT_TYPES.has(node.type)) {
       g.setAttribute("id", node.id);
-      g.setAttribute("class", "fp-turnout" + (sel ? " node-selected" : ""));
+      g.setAttribute("class", "fp-turnout" + ha.liveClass("turnout", node.entity) + (sel ? " node-selected" : ""));
     } else if (node.type === "link") {
       // Eigene ID und Klickfläche: in HA führt ein Klick auf die Zielseite
       g.setAttribute("id", node.id);
@@ -635,7 +637,7 @@ function renderSignals() {
     const f = signalFrame(sig);
     if (!f) return;
     const sel = isSelected("signal", sig.id);
-    const g = el("g", { id: sig.id }, "fp-signal" + (sel ? " sig-selected" : ""));
+    const g = el("g", { id: sig.id }, "fp-signal" + ha.liveClass("signal", sig.entity) + (sel ? " sig-selected" : ""));
     g.dataset.signal = sig.id;
     const body = el("g", { transform: `translate(${f.center.x},${f.center.y}) rotate(${f.angle})` });
     body.appendChild(el("line", { x1: -17, y1: -5.5, x2: -17, y2: 5.5, class: "mast" }));
@@ -1419,7 +1421,7 @@ function hasTextSelection() {
 function isTextTarget(t) {
   return !!t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA" || t.isContentEditable);
 }
-function modalOpen() { return !helpOverlay.hidden || !pasteOverlay.hidden; }
+function modalOpen() { return !helpOverlay.hidden || !pasteOverlay.hidden || ha.dialogOpen(); }
 
 function onClipboardEvent(ev, cut) {
   if (modalOpen() || isTextTarget(ev.target) || hasTextSelection()) return;
@@ -1515,6 +1517,7 @@ const ARROW_KEYS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], A
 document.addEventListener("keydown", (ev) => {
   if (ev.key === "Escape") {
     if (!pasteOverlay.hidden) closePasteDialog();
+    else if (ha.closeDialog()) return;
     else if (!helpOverlay.hidden) helpOverlay.hidden = true;
     else if (isTextTarget(ev.target)) ev.target.blur();
     else if (drag) return;
@@ -1601,6 +1604,14 @@ function textInput(value, onChange, placeholder) {
   return i;
 }
 
+/* Entity-Feld: in Home Assistant mit Vorschlagsliste und aktuellem Zustand (ha.js) */
+function entityField(labelText, obj, domains, hint) {
+  const input = textInput(obj.entity, v => { obj.entity = v.trim(); renderAll(); });
+  const wrap = field(labelText, input, hint);
+  ha.decorateEntityField(wrap, input, obj.entity, domains);
+  return wrap;
+}
+
 function renderProps() {
   propsForm.innerHTML = "";
   if (!selectionCount()) { propsEmpty.hidden = false; propsForm.hidden = true; return; }
@@ -1626,9 +1637,9 @@ function renderProps() {
         propsForm.appendChild(field("Element-ID (für SVG/YAML)", textInput(node.id, v => {
           renameElement("node", node.id, sanitizeId(v)); renderAll();
         }), "Wird als SVG-Element-ID und in der YAML-Regel verwendet."));
-        propsForm.appendChild(field("HA-Entity (switch.…)", textInput(node.entity, v => {
-          node.entity = v.trim(); renderAll();
-        }), "z.B. switch.weiche_5"));
+        propsForm.appendChild(entityField("HA-Entity (switch.…)", node, ["switch", "input_boolean"], "z.B. switch.weiche_5"));
+        const toggleBtn = ha.toggleButton(node.entity);
+        if (toggleBtn) propsForm.appendChild(toggleBtn);
         propsForm.appendChild(field("Beschriftung (optional)", textInput(node.label, v => { node.label = v; renderAll(); }),
           "Wird neben der Weiche angezeigt – auch im exportierten SVG und damit in Home Assistant."));
       }
@@ -1686,9 +1697,8 @@ function renderProps() {
     propsForm.appendChild(field("Element-ID", textInput(sig.id, v => {
       renameElement("signal", sig.id, sanitizeId(v)); renderAll();
     })));
-    propsForm.appendChild(field("HA-Entity (light./input_select.…)", textInput(sig.entity, v => {
-      sig.entity = v.trim(); renderAll();
-    }), "Zustand 'on' → grün, 'off' → rot (siehe YAML-Export)."));
+    propsForm.appendChild(entityField("HA-Entity (light./input_select.…)", sig, ["light", "input_select", "input_boolean", "switch"],
+      "Zustand 'on' → grün, 'off' → rot (siehe YAML-Export)."));
     propsForm.appendChild(field("Label (optional)", textInput(sig.label, v => { sig.label = v; renderAll(); })));
     const delBtn = document.createElement("button");
     delBtn.className = "wide";
@@ -1739,9 +1749,7 @@ function renderBlockProps(b) {
     renameElement("block", b.id, sanitizeId(v)); renderAll();
   })));
   propsForm.appendChild(field("Name", textInput(b.name, v => { b.name = v; renderAll(); })));
-  propsForm.appendChild(field("HA-Entity (binary_sensor.…)", textInput(b.entity, v => {
-    b.entity = v.trim(); renderAll();
-  }), "Zustand 'on' = belegt (rot eingefärbt)."));
+  propsForm.appendChild(entityField("HA-Entity (binary_sensor.…)", b, ["binary_sensor", "input_boolean"], "Zustand 'on' = belegt (rot eingefärbt)."));
   const colorInput = document.createElement("input");
   colorInput.type = "color";
   colorInput.value = b.color;
@@ -1773,7 +1781,7 @@ function renderBlockList() {
   blockListEl.innerHTML = "";
   Object.values(state.blocks).forEach(b => {
     const li = document.createElement("li");
-    li.className = isSelected("block", b.id) ? "active" : "";
+    li.className = (isSelected("block", b.id) ? "active" : "") + (ha.isOn(b.entity) ? " occupied" : "");
     li.innerHTML = '<span class="swatch"></span><span class="name"></span><span class="count"></span>';
     li.children[0].style.background = b.color;
     li.children[1].textContent = b.name;
@@ -1812,11 +1820,22 @@ function downloadFile(filename, content, mime) {
 }
 
 function emptyState() {
-  return { planId: uid(), nodes: {}, edges: {}, signals: {}, blocks: {}, counters: { straight: 0, turnout: 0, cross: 0, buffer: 0, link: 0, joint: 0, signal: 0, block: 0 } };
+  return { planId: uid(), name: "", nodes: {}, edges: {}, signals: {}, blocks: {}, counters: { straight: 0, turnout: 0, cross: 0, buffer: 0, link: 0, joint: 0, signal: 0, block: 0 } };
+}
+
+/* Plan komplett ersetzen (aus Home Assistant geladen); der Verlauf beginnt neu */
+function openPlan(data) {
+  state = normalizeState(data);
+  clearSelection(); activeBlockId = null;
+  undoStack = []; historyIndex = -1;
+  renderAll();
+  fitView();
 }
 
 document.getElementById("btnNew").addEventListener("click", () => {
-  if (!confirm("Aktuellen Plan verwerfen und neu beginnen?")) return;
+  // In Home Assistant bleibt der bisherige Plan gespeichert – dort nichts zu verwerfen
+  if (!ha.connected && !confirm("Aktuellen Plan verwerfen und neu beginnen?")) return;
+  ha.flush();
   state = emptyState();
   clearSelection(); activeBlockId = null;
   renderAll();
@@ -1836,6 +1855,7 @@ document.getElementById("fileLoadJson").addEventListener("change", (ev) => {
     try {
       const parsed = JSON.parse(reader.result);
       if (!parsed.nodes) throw new Error("ungültiges Format");
+      ha.flush();
       state = normalizeState(parsed);
       clearSelection(); activeBlockId = null;
       renderAll();
@@ -1886,6 +1906,9 @@ function buildExportSvg() {
     const clone = document.getElementById(id).cloneNode(true);
     clone.querySelectorAll(".node-selected,.edge-selected,.block-selected,.sig-selected,.block-editing")
       .forEach(node => node.classList.remove("node-selected", "edge-selected", "block-selected", "sig-selected", "block-editing"));
+    // Live-Zustände aus Home Assistant gehören nicht in die Datei
+    clone.querySelectorAll(".turnout-straight,.turnout-diverging,.signal-red,.signal-green")
+      .forEach(node => node.classList.remove("turnout-straight", "turnout-diverging", "signal-red", "signal-green"));
     clone.querySelectorAll(".edge-hit").forEach(node => node.remove());
     clone.querySelectorAll(".fp-joint").forEach(node => node.remove());
     // Blöcke: alle in die gemeinsame Gruppe, Grundzustand unsichtbar
@@ -1899,10 +1922,11 @@ function buildExportSvg() {
   return out;
 }
 
+function exportSvgXml() {
+  return '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(buildExportSvg());
+}
 document.getElementById("btnExportSvg").addEventListener("click", () => {
-  const out = buildExportSvg();
-  const xml = '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(out);
-  downloadFile("gleisplan.svg", xml, "image/svg+xml");
+  downloadFile("gleisplan.svg", exportSvgXml(), "image/svg+xml");
 });
 
 /* ---------- Export: CSS ---------- */
@@ -1956,12 +1980,13 @@ document.getElementById("btnExportCss").addEventListener("click", () => {
 /* ---------- Export: ha-floorplan YAML ---------- */
 function yamlStr(s) { return `"${String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`; }
 
-function buildYaml() {
+// fileBase: Dateiname von SVG/CSS ohne Endung (beim Veröffentlichen aus dem Plannamen)
+function buildYaml(fileBase = "gleisplan") {
   const lines = [];
   lines.push("# Automatisch generierte ha-floorplan Konfiguration");
   lines.push("# Pfade an eure www/floorplan-Ablage in Home Assistant anpassen.");
-  lines.push("image: /local/floorplan/gleisplan.svg");
-  lines.push("stylesheet: /local/floorplan/gleisplan.css");
+  lines.push(`image: /local/floorplan/${fileBase}.svg`);
+  lines.push(`stylesheet: /local/floorplan/${fileBase}.css`);
   lines.push("rules:");
   let any = false;
 

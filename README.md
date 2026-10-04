@@ -1,15 +1,59 @@
 # Gleisplan-Editor für ha-floorplan
 
-Lokales Web-Tool zum Zeichnen von Modellbahn-Gleisplänen (Geraden, Kurven,
+Web-Tool zum Zeichnen von Modellbahn-Gleisplänen (Geraden, Kurven,
 Weichen, Kreuzungen, Prellböcke, Links, Signale, Blockabschnitte) im Stil der
 Märklin CS3 – als Grundlage für die [ha-floorplan](https://github.com/ExperienceLovelace/ha-floorplan)-Karte
 in Home Assistant.
 
-## Starten
+Der Editor läuft auf zwei Arten:
 
-Einfach `index.html` per Doppelklick im Browser öffnen (Chrome/Edge/Firefox/Safari).
-Kein Server, kein Build-Schritt, keine Internetverbindung nötig. Der Plan wird
-automatisch im Browser (`localStorage`) zwischengespeichert.
+- **als Panel in Home Assistant** (Custom Integration): mit Entity-Auswahl, Live-Zuständen,
+  Plan-Speicherung in Home Assistant und Veröffentlichen per Knopfdruck,
+- **eigenständig im Browser**, ohne Home Assistant: Übergabe per Datei-Export.
+
+## Installation in Home Assistant
+
+Voraussetzung: Home Assistant 2024.7 oder neuer. Die Installationsart spielt keine Rolle
+(HA OS, Container, Core).
+
+1. **Über HACS**: HACS → ⋮ → *Benutzerdefinierte Repositories* → URL dieses Repositorys,
+   Typ *Integration* → „Gleisplan-Editor“ installieren.
+   **Oder von Hand**: den Ordner `custom_components/gleisplan_editor` nach
+   `<config>/custom_components/` kopieren.
+2. Home Assistant neu starten.
+3. *Einstellungen → Geräte & Dienste → Integration hinzufügen* → „Gleisplan-Editor“.
+4. In der Seitenleiste erscheint **Gleisplan** (nur für Administratoren).
+
+Für die Anzeige im Dashboard wird zusätzlich
+[ha-floorplan](https://github.com/ExperienceLovelace/ha-floorplan) benötigt (über HACS).
+
+### Was das Panel zusätzlich kann
+
+- **Entity-Auswahl**: Die Entity-Felder schlagen die vorhandenen Entities vor (passende
+  Domänen zuerst) und zeigen darunter den aktuellen Zustand. Unbekannte Entities werden rot
+  markiert.
+- **Live-Zustände**: Weichen und Signale zeigen im Editor die Stellung der Anlage, belegte
+  Blöcke sind in der Blockliste markiert. Über „Weiche schalten (Test)“ lässt sich die
+  Zuordnung direkt prüfen.
+- **Pläne in Home Assistant**: Der geöffnete Plan wird nach jeder Änderung automatisch
+  gespeichert (`<config>/.storage/gleisplan_editor.plans`) und steht damit auf jedem Gerät
+  bereit. Oben den Plannamen eintragen; „Pläne…“ öffnet oder löscht gespeicherte Pläne,
+  „Neuer Plan“ legt einen weiteren an.
+- **In HA veröffentlichen**: schreibt SVG und CSS nach `<config>/www/floorplan/`. Der
+  Dateiname folgt dem Plannamen („Bahnhof Süd“ → `bahnhof_sued.svg`), ohne Namen
+  `gleisplan.svg`. Danach zeigt ein Dialog die fertige Karte als YAML: beim ersten Mal in
+  ein Dashboard einfügen (*Karte hinzufügen → Manuell*). Später genügt erneutes
+  Veröffentlichen, solange sich keine Entities, Element-IDs oder Link-Ziele ändern – sonst
+  die Karte neu einfügen.
+
+Wurde der Ordner `www` beim Veröffentlichen erst angelegt, muss Home Assistant einmal neu
+gestartet werden, damit `/local/…` erreichbar ist (der Dialog weist darauf hin).
+
+## Eigenständig starten (ohne Home Assistant)
+
+`custom_components/gleisplan_editor/frontend/index.html` per Doppelklick im Browser öffnen
+(Chrome/Edge/Firefox/Safari). Kein Server, kein Build-Schritt, keine Internetverbindung
+nötig. Der Plan wird automatisch im Browser (`localStorage`) zwischengespeichert.
 
 ## Bedienung
 
@@ -47,6 +91,8 @@ automatisch im Browser (`localStorage`) zwischengespeichert.
 
 ## Einrichtung in Home Assistant
 
+Die Schritte 1–3 gelten für den Datei-Export; im Panel erledigt sie „In HA veröffentlichen“.
+
 1. [ha-floorplan](https://github.com/ExperienceLovelace/ha-floorplan) über HACS installieren.
 2. `gleisplan.svg` und `gleisplan.css` nach `<config>/www/floorplan/` kopieren.
 3. Inhalt von `gleisplan-floorplan.yaml` komplett in den YAML-Editor einer neuen
@@ -70,3 +116,26 @@ automatisch im Browser (`localStorage`) zwischengespeichert.
 Die generierte YAML ist ein **Startpunkt** – Klassennamen (`block-occupied`,
 `turnout-diverging`, `signal-green`, …) lassen sich in `gleisplan.css` frei
 anpassen, ebenso die Farben/Stile.
+
+## Aufbau
+
+```
+custom_components/gleisplan_editor/
+├── __init__.py        Panel, Plan-Speicher, Schreib-Befehl (WebSocket, nur Administratoren)
+├── config_flow.py     Einrichtung über die Oberfläche
+├── manifest.json
+└── frontend/
+    ├── panel.js       Panel für die Seitenleiste: zeigt index.html im iframe, reicht hass hinein
+    ├── index.html     der Editor
+    ├── app.js
+    ├── ha.js          Home-Assistant-Anbindung, ohne Panel wirkungslos
+    └── style.css
+```
+
+Die Editor-Dateien liefert Home Assistant unter `/gleisplan_editor/…` ohne Anmeldung aus – dort
+liegt nur der Editor-Code. Pläne und das Schreiben von Dateien laufen über die angemeldete
+WebSocket-Verbindung und sind auf Administratoren beschränkt.
+
+## Lizenz
+
+[MIT](LICENSE)

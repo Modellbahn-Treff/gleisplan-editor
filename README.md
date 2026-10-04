@@ -1,8 +1,7 @@
 # Gleisplan-Editor für ha-floorplan
 
 Web-Tool zum Zeichnen von Modellbahn-Gleisplänen (Geraden, Kurven,
-Weichen, Kreuzungen, Prellböcke, Links, Signale, Blockabschnitte) im Stil der
-Märklin CS3 – als Grundlage für die [ha-floorplan](https://github.com/ExperienceLovelace/ha-floorplan)-Karte
+Weichen, Kreuzungen, Prellböcke, Links, Signale, Blockabschnitte) – als Grundlage für die [ha-floorplan](https://github.com/ExperienceLovelace/ha-floorplan)-Karte
 in Home Assistant.
 
 Der Editor läuft auf zwei Arten:

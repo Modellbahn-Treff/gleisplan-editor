@@ -221,7 +221,10 @@ function redo() { stepHistory(1); }
 
 /* ---------- Anschluss-Geometrie (lokal, Knotenmittelpunkt = 0,0) ----------
    angle: Richtung vom Knotenmittelpunkt weg, in die der Nachbar liegt
-   (0=Ost, 90=Süd, 180=West, 270=Nord; SVG-Y wächst nach unten). */
+   (0=Ost, 90=Süd, 180=West, 270=Nord; SVG-Y wächst nach unten).
+   Weichen: alle Ports liegen 20 (= GRID_SNAP) vom Mittelpunkt entfernt, der Abzweig
+   auf dem 30°-Strahl (17.32 = 20·cos 30°). So liegen ungedreht Einfahrt und Stammgleis
+   im Raster, und um 30° gedreht (Abzweig waagerecht) der Abzweig-Port. */
 function getPortDefs(type) {
   switch (type) {
     case "straight":
@@ -231,22 +234,22 @@ function getPortDefs(type) {
       };
     case "turnout_l":
       return {
-        entry: { x: -24, y: 0, angle: 180 },
-        through: { x: 24, y: 0, angle: 0 },
-        diverge: { x: 20, y: -14, angle: 330 }
+        entry: { x: -20, y: 0, angle: 180 },
+        through: { x: 20, y: 0, angle: 0 },
+        diverge: { x: 17.32, y: -10, angle: 330 }
       };
     case "turnout_r":
       return {
-        entry: { x: -24, y: 0, angle: 180 },
-        through: { x: 24, y: 0, angle: 0 },
-        diverge: { x: 20, y: 14, angle: 30 }
+        entry: { x: -20, y: 0, angle: 180 },
+        through: { x: 20, y: 0, angle: 0 },
+        diverge: { x: 17.32, y: 10, angle: 30 }
       };
     case "turnout_y":
       return {
-        entry: { x: -24, y: 0, angle: 180 },
-        through: { x: 24, y: 0, angle: 0 },
-        divergeA: { x: 20, y: -14, angle: 330 },
-        divergeB: { x: 20, y: 14, angle: 30 }
+        entry: { x: -20, y: 0, angle: 180 },
+        through: { x: 20, y: 0, angle: 0 },
+        divergeA: { x: 17.32, y: -10, angle: 330 },
+        divergeB: { x: 17.32, y: 10, angle: 30 }
       };
     case "cross":
       return {

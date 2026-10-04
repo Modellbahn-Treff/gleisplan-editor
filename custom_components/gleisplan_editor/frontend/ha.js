@@ -286,6 +286,10 @@ const ha = (() => {
     const base = fileBase();
     try {
       const res = await ws("publish", { name: base, svg: exportSvgXml(), css: buildCss() });
+      // /local liefert mit langer Cache-Dauer aus: beide Dateien am Cache vorbei neu laden,
+      // damit der Browser-Cache die neue Fassung enthält. Fehler (z. B. /local noch nicht
+      // erreichbar) sind hier unerheblich.
+      await Promise.allSettled([res.svg_url, res.css_url].map((url) => fetch(url, { cache: "reload" })));
       $("haPublishSummary").textContent = `Geschrieben: ${res.svg_url} und ${res.css_url}`;
       $("haPublishHint").textContent =
         (res.restart_required ? "Der Ordner www wurde gerade erst angelegt – Home Assistant einmal neu starten, damit /local erreichbar ist. " : "") +
